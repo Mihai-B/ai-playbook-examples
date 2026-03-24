@@ -1,0 +1,52 @@
+---
+description: Core .NET coding standards for the project
+alwaysApply: true
+---
+
+# .NET Coding Standards
+
+## Code Style
+
+- Use C# 12+ with file-scoped namespaces
+- Follow .NET naming conventions (PascalCase for public members, _camelCase for private fields)
+- All public members must have XML docs
+- Prefer records for DTOs and value objects
+- Use `var` only when the type is obvious from the right side
+
+## Architecture
+
+- **Framework**: .NET 8+ with ASP.NET Core
+- **ORM**: Entity Framework Core with code-first migrations
+- **Testing**: xUnit + FluentAssertions + NSubstitute
+- **API Style**: Minimal API with endpoint grouping
+
+## Build and Test
+
+```bash
+dotnet restore          # Restore packages
+dotnet build            # Build solution
+dotnet test             # Run all tests
+dotnet run --project src/Api  # Start API server
+dotnet ef database update     # Apply migrations
+```
+
+## Project Structure
+
+```
+src/
+  Api/              # Minimal API endpoints, middleware, DI setup
+  Domain/           # Entities, value objects, domain events
+  Application/      # Use cases, DTOs, interfaces
+  Infrastructure/   # EF Core, external services, repositories
+tests/
+  UnitTests/        # xUnit unit tests
+  IntegrationTests/ # Integration tests with TestContainers
+```
+
+## Conventions
+
+- API endpoints follow REST: `GET /api/users`, `POST /api/users`, `GET /api/users/{id}`
+- Error responses use ProblemDetails (RFC 9457)
+- Configuration is validated at startup via Options pattern with `IValidateOptions<T>`
+- Never edit EF Core generated migration files
+- One class per file, filename matches class name

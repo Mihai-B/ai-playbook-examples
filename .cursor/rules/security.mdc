@@ -1,0 +1,38 @@
+---
+description: Security guidelines for .NET APIs. Use when working on authentication, authorization, input validation, or handling secrets.
+alwaysApply: false
+---
+
+# Security Guidelines
+
+## Input Validation
+
+- Validate ALL user input at the API boundary using FluentValidation
+- Never trust client-side validation alone
+- Use parameterized queries — EF Core does this by default, but watch raw SQL
+
+```csharp
+public class CreateUserValidator : AbstractValidator<CreateUserRequest>
+{
+    public CreateUserValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(255);
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.Role).IsInEnum();
+    }
+}
+```
+
+## Authentication & Authorization
+
+- Use ASP.NET Core Identity or JWT Bearer tokens
+- Short-lived access tokens (15 min), long-lived refresh tokens (7 days) stored server-side
+- Hash passwords with bcrypt or Argon2id (never MD5/SHA)
+- Rate-limit auth endpoints with `AspNetCoreRateLimit` or built-in rate limiter
+- Check permissions via `[Authorize(Policy = "...")]` or endpoint filters — not inside handlers
+
+## Secrets
+
+- Never hardcode secrets — use `IConfiguration` with User Secrets / Azure Key Vault
+- Never log tokens, passwords, or PII
+- Use `IOptions<T>` with validation for typed configuration access

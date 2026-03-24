@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "npx prettier --write $TOOL_ARG_FILE_PATH",
+        "timeout": 10,
+        "description": "Auto-format files after Copilot edits them"
+      }
+    ]
+  }
+}

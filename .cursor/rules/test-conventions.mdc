@@ -1,0 +1,56 @@
+---
+description: .NET test conventions for xUnit, FluentAssertions, and NSubstitute
+globs: "**/*Tests.cs, **/*Tests/**/*.cs"
+alwaysApply: false
+---
+
+# Test Conventions
+
+## Naming
+
+Use the pattern: `MethodName_Scenario_ExpectedResult`
+
+```csharp
+public class UserServiceTests
+{
+    [Fact]
+    public async Task GetByIdAsync_UserExists_ReturnsUser()
+    {
+        // Arrange
+        var repo = Substitute.For<IUserRepository>();
+        repo.GetByIdAsync(1, Arg.Any<CancellationToken>())
+            .Returns(new User { Id = 1, Name = "Jane" });
+        var sut = new UserService(repo);
+
+        // Act
+        var result = await sut.GetByIdAsync(1, CancellationToken.None);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("Jane");
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_UserNotFound_ReturnsNull()
+    {
+        var repo = Substitute.For<IUserRepository>();
+        repo.GetByIdAsync(99, Arg.Any<CancellationToken>())
+            .Returns((User?)null);
+        var sut = new UserService(repo);
+
+        var result = await sut.GetByIdAsync(99, CancellationToken.None);
+
+        result.Should().BeNull();
+    }
+}
+```
+
+## Rules
+
+- Use xUnit with FluentAssertions for readable assertions
+- Use NSubstitute for mocking — never mock concrete classes
+- Follow Arrange/Act/Assert structure
+- One logical assertion per test
+- Use test fixtures or builders for complex test data — avoid raw object literals
+- Name the system under test `sut`
+- Place test files mirroring source structure: `src/Application/UserService.cs` → `tests/UnitTests/Application/UserServiceTests.cs`

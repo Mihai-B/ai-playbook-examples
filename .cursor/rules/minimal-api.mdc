@@ -1,0 +1,47 @@
+---
+description: Minimal API endpoint patterns for ASP.NET Core. Use when creating or modifying API endpoints, route handlers, or endpoint groups.
+alwaysApply: false
+---
+
+# Minimal API Patterns
+
+## Endpoint Group Pattern
+
+```csharp
+public static class UserEndpoints
+{
+    public static RouteGroupBuilder MapUserEndpoints(this WebApplication app)
+    {
+        var group = app.MapGroup("/api/users")
+            .WithTags("Users")
+            .RequireAuthorization();
+
+        group.MapGet("/", GetAllUsers);
+        group.MapGet("/{id}", GetUserById);
+        group.MapPost("/", CreateUser);
+        group.MapPut("/{id}", UpdateUser);
+        group.MapDelete("/{id}", DeleteUser);
+
+        return group;
+    }
+
+    private static async Task<Results<Ok<UserResponse>, NotFound>> GetUserById(
+        int id, IUserService userService, CancellationToken ct)
+    {
+        var user = await userService.GetByIdAsync(id, ct);
+        return user is not null
+            ? TypedResults.Ok(user)
+            : TypedResults.NotFound();
+    }
+}
+```
+
+## Conventions
+
+- Use `TypedResults` for all responses — enables OpenAPI schema generation
+- Group endpoints with `MapGroup()` and apply shared filters/auth
+- Add `FluentValidation` for input models — validate in an endpoint filter
+- Accept `CancellationToken` in all async handlers
+- Return `Results<T1, T2>` union types for multiple response codes
+- Register endpoint groups in `Program.cs`: `app.MapUserEndpoints()`
+- Keep handlers thin — delegate to service layer via DI

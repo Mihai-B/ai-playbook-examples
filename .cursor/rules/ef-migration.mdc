@@ -1,0 +1,37 @@
+---
+description: EF Core migration checklist. Use when creating, reviewing, or troubleshooting database migrations.
+alwaysApply: false
+---
+
+# EF Core Migration Checklist
+
+## Creating Migrations
+
+1. Always generate an idempotent migration
+2. Add a rollback script for each migration
+3. Test against a seeded local database before committing
+4. Name migrations descriptively: `AddUserEmailIndex`, not `UpdateSchema`
+
+## Commands
+
+```bash
+# Create migration
+dotnet ef migrations add AddUserEmailIndex --project src/Infrastructure
+
+# Apply migration
+dotnet ef database update --project src/Infrastructure
+
+# Generate idempotent SQL script
+dotnet ef migrations script --idempotent --project src/Infrastructure -o migrations.sql
+
+# Rollback to a previous migration
+dotnet ef database update PreviousMigrationName --project src/Infrastructure
+```
+
+## Safety Rules
+
+- Never drop columns in the same release as code removal (two-phase approach)
+- Never edit a migration that has been applied to any shared environment
+- Always review the generated `.Designer.cs` snapshot diff before committing
+- Add `@@index` attributes for columns used in WHERE clauses or JOINs
+- Use `migrationBuilder.Sql()` sparingly — prefer EF fluent API
