@@ -56,19 +56,66 @@ Copilot playbooks (also called customization files) let you tailor Copilot's beh
 ### Claude Code (`CLAUDE.md` + `.claude/`)
 
 ```
-CLAUDE.md                                # Project-wide instructions (always loaded)
+CLAUDE.md                                    # Project-wide instructions (always loaded)
 .claude/
-├── settings.json                        # Hooks (auto-format on edit)
-└── commands/
-    ├── architect.md                     # Architecture advisor (persona command)
-    ├── debugger.md                      # Debugging specialist (persona command)
-    ├── reviewer.md                      # Code review specialist (persona command)
-    ├── code-review.md                   # Review code for issues
-    ├── create-api-endpoint.md           # Scaffold a REST endpoint
-    ├── document-code.md                 # Generate documentation
-    ├── generate-tests.md                # Generate test cases
-    ├── refactor.md                      # Refactor selected code
-    └── deploy-checklist.md              # Deployment checklist
+├── settings.json                            # Hooks (auto-format on edit)
+└── skills/
+    ├── reviewer/                            # Senior code reviewer
+    │   ├── SKILL.md                         #   Main instructions
+    │   ├── reference.md                     #   Severity levels & output format
+    │   └── examples.md                      #   Sample review outputs
+    ├── architect/                           # Architecture advisor
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   ADR format & diagram conventions
+    │   └── examples.md
+    ├── debugger/                            # Debugging specialist
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   Debugging methodology
+    │   └── examples.md
+    ├── code-review/                         # Structured review checklist
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   Checklist categories
+    │   └── examples.md
+    ├── create-api-endpoint/                 # Scaffold REST endpoints
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   REST conventions & file structure
+    │   └── examples.md
+    ├── deploy-checklist/                    # Pre-deployment verification
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   Full deployment checklist
+    │   └── examples.md
+    ├── document-code/                       # Generate documentation
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   JSDoc conventions
+    │   └── examples.md
+    ├── generate-tests/                      # Generate test cases
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   Test structure & naming
+    │   └── examples.md
+    ├── refactor/                            # Code restructuring
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   Refactoring patterns
+    │   └── examples.md
+    ├── explain-code/                        # Code walkthroughs
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   Explanation structure
+    │   └── examples.md
+    ├── pr-description/                      # PR title & description
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   PR format template
+    │   └── examples.md
+    ├── performance-audit/                   # Performance bottlenecks
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   Common anti-patterns
+    │   └── examples.md
+    ├── migration-guide/                     # Safe DB migrations
+    │   ├── SKILL.md
+    │   ├── reference.md                     #   Two-phase approach & patterns
+    │   └── examples.md
+    └── security-audit/                      # OWASP vulnerability scanning
+        ├── SKILL.md
+        ├── reference.md                     #   OWASP Top 10 checklist
+        └── examples.md
 ```
 
 ## How to Use These Examples
@@ -92,14 +139,14 @@ Then open your project in VS Code — Copilot will automatically pick up the cus
 
 ### Claude Code
 
-Copy `CLAUDE.md` to your project root and `.claude/` folder for commands and hooks:
+Copy `CLAUDE.md` to your project root and `.claude/` folder for skills and hooks:
 
 ```bash
 cp CLAUDE.md /path/to/your/project/
 cp -r .claude/ /path/to/your/project/.claude/
 ```
 
-Then run `claude` in your project directory — it will automatically load `CLAUDE.md`. Use `/command-name` to invoke custom commands.
+Then run `claude` in your project directory — it will automatically load `CLAUDE.md`. Use `/skill-name` to invoke skills (e.g., `/reviewer`, `/generate-tests`, `/security-audit`).
 
 ## Key Concepts
 
@@ -145,16 +192,26 @@ Apply when working in `src/api/` or `src/routes/`.
 
 You can also place `CLAUDE.md` files in subdirectories — they're loaded when Claude works with files in that directory.
 
-#### Commands Replace Prompts, Agents, and Skills
-Claude Code uses `.claude/commands/*.md` for all reusable workflows. The filename becomes the slash command name. Use `$ARGUMENTS` as a placeholder for user input:
+#### Skills Replace Commands
+Claude Code skills live in `.claude/skills/<name>/` directories. Each skill is a folder with:
 
-```markdown
-Generate tests for:
+- **`SKILL.md`** (required) — Frontmatter (name, description) + main instructions
+- **`reference.md`** (on demand) — Detailed formats, checklists, conventions
+- **`examples.md`** (on demand) — Sample inputs and outputs
 
-$ARGUMENTS
+The `SKILL.md` frontmatter controls behavior:
+
+```yaml
+---
+name: my-skill
+description: What this skill does and when to use it
+disable-model-invocation: true  # Only manual /my-skill invocation
+---
 ```
 
-Invoke with `/generate-tests src/services/UserService.ts` in Claude Code.
+Claude loads `SKILL.md` when relevant and fetches supporting files only when needed, keeping context usage efficient.
+
+> **Note**: `.claude/commands/*.md` files still work and are supported, but skills are the recommended format as they support supporting files and additional frontmatter options.
 
 #### Hooks Live in Settings
 Claude Code hooks are configured in `.claude/settings.json` under the `hooks` key, not as separate files.
@@ -165,9 +222,9 @@ Claude Code hooks are configured in `.claude/settings.json` under the `hooks` ke
 |---------|-------------------|-------------------|
 | Project instructions | `.github/copilot-instructions.md` | `CLAUDE.md` (root) |
 | Scoped instructions | `.github/instructions/*.instructions.md` with `applyTo` | Subdirectory `CLAUDE.md` files |
-| Reusable prompts | `.github/prompts/*.prompt.md` | `.claude/commands/*.md` |
-| Specialized agents | `.github/agents/*.agent.md` | `.claude/commands/*.md` (persona in prompt) |
-| Multi-step skills | `.github/skills/*/SKILL.md` | `.claude/commands/*.md` (inline steps) |
+| Reusable prompts | `.github/prompts/*.prompt.md` | `.claude/skills/*/SKILL.md` |
+| Specialized agents | `.github/agents/*.agent.md` | `.claude/skills/*/SKILL.md` (persona in role) |
+| Multi-step skills | `.github/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` + supporting files |
 | Lifecycle hooks | `.github/hooks/*.json` | `.claude/settings.json` `hooks` section |
 
 ## Documentation
@@ -180,11 +237,11 @@ Claude Code hooks are configured in `.claude/settings.json` under the `hooks` ke
 - [Hooks](https://code.visualstudio.com/docs/copilot/customization/hooks)
 
 ### Claude Code
-- [Claude Code Overview](https://docs.anthropic.com/en/docs/claude-code/overview)
-- [CLAUDE.md Memory Files](https://docs.anthropic.com/en/docs/claude-code/memory)
-- [Custom Slash Commands](https://docs.anthropic.com/en/docs/claude-code/slash-commands)
-- [Hooks](https://docs.anthropic.com/en/docs/claude-code/hooks)
-- [Settings](https://docs.anthropic.com/en/docs/claude-code/settings)
+- [Claude Code Overview](https://code.claude.com/docs/en/overview)
+- [CLAUDE.md Memory Files](https://code.claude.com/docs/en/memory)
+- [Skills](https://code.claude.com/docs/en/skills)
+- [Hooks](https://code.claude.com/docs/en/hooks)
+- [Settings](https://code.claude.com/docs/en/settings)
 
 ## License
 
