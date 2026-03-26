@@ -5,7 +5,20 @@ description: Patterns and conventions for implementing CRUD features in .NET Cle
 
 # CRUD Implementation Guide
 
-## Architecture Overview
+Reference patterns and conventions for building CRUD features in .NET Clean Architecture.
+
+## When to Use
+
+- When creating a new entity, repository, service, or endpoint
+- When the user asks to add a resource that involves data persistence
+- When reviewing CRUD code for convention compliance
+- As a reference for the `implement-crud` skill
+
+## Parameters
+
+None — this is a reference skill loaded automatically when CRUD work is detected.
+
+## Context
 
 Every CRUD feature follows a vertical slice through these layers:
 
@@ -17,8 +30,6 @@ Endpoint → Service → Repository → EF Core → Database
 
 Always implement bottom-up: Entity → EF Config → Repository → Service → DTOs → Endpoint → Tests.
 
-## Layer Responsibilities
-
 | Layer | Location | Responsibility |
 |-------|----------|----------------|
 | Entity | `src/Domain/Entities/` | Domain model, no dependencies |
@@ -29,141 +40,28 @@ Always implement bottom-up: Entity → EF Config → Repository → Service → 
 | Validator | `src/Application/{Feature}/` | Input validation with FluentValidation |
 | Endpoint | `src/Api/Endpoints/` | HTTP routing, thin handlers |
 
-## Key Patterns
+## Task
 
-### Entity
+When applying these patterns, follow these conventions per layer:
 
-```csharp
-namespace Domain.Entities;
+**Entity** — Include `CreatedAt` / `UpdatedAt` audit fields; use `required` modifier for non-nullable reference properties; keep entities free of framework dependencies.
 
-public class Product
-{
-    public int Id { get; set; }
-    public required string Name { get; set; }
-    public decimal Price { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
-}
-```
+**EF Configuration** — Always configure max lengths explicitly; add indexes on columns used in filters, sorting, or lookups; use `HasPrecision` for decimal columns.
 
-- Always include `CreatedAt` / `UpdatedAt` audit fields
-- Use `required` modifier for non-nullable reference properties
-- Keep entities free of framework dependencies
+**Repository** — Use `AsNoTracking()` for all read-only queries; always paginate list queries; accept `CancellationToken` in every async method.
 
-### EF Configuration
+**DTOs** — Use `record` types for immutability; never expose audit fields in request DTOs; keep response DTOs flat.
 
-```csharp
-namespace Infrastructure.Data.Configurations;
+**Endpoints** — Use `TypedResults` for OpenAPI schema generation; `Results<T1, T2>` union types for multiple status codes; route constraints like `{id:int}` for type safety.
 
-public class ProductConfiguration : IEntityTypeConfiguration<Product>
-{
-    public void Configure(EntityTypeBuilder<Product> builder)
-    {
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
-        builder.Property(x => x.Price).HasPrecision(18, 2);
-        builder.HasIndex(x => x.Name);
-    }
-}
-```
+## Constraints
 
-- Always configure max lengths explicitly — never rely on defaults
-- Add indexes on columns used in filters, sorting, or lookups
-- Use `HasPrecision` for decimal columns
-
-### Repository
-
-```csharp
-public class ProductRepository : IProductRepository
-{
-    private readonly AppDbContext _db;
-
-    public ProductRepository(AppDbContext db) => _db = db;
-
-    public async Task<Product?> GetByIdAsync(int id, CancellationToken ct)
-        => await _db.Products.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-
-    public async Task<(IReadOnlyList<Product> Items, int TotalCount)> GetPagedAsync(
-        int page, int pageSize, CancellationToken ct)
-    {
-        var total = await _db.Products.CountAsync(ct);
-        var items = await _db.Products
-            .AsNoTracking()
-            .OrderBy(x => x.Id)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
-        return (items, total);
-    }
-
-    public async Task<Product> AddAsync(Product entity, CancellationToken ct)
-    {
-        _db.Products.Add(entity);
-        await _db.SaveChangesAsync(ct);
-        return entity;
-    }
-}
-```
-
-- `AsNoTracking()` for all read-only queries
-- Always paginate list queries — never return unbounded results
-- Accept `CancellationToken` in every async method
-
-### DTOs
-
-```csharp
-public record ProductResponse(int Id, string Name, decimal Price, DateTime CreatedAt);
-public record CreateProductRequest(string Name, decimal Price);
-public record UpdateProductRequest(string Name, decimal Price);
-```
-
-- Use `record` types for immutability
-- Never expose audit fields in request DTOs
-- Keep response DTOs flat — avoid nested entity graphs
-
-### Endpoints
-
-```csharp
-public static class ProductEndpoints
-{
-    public static RouteGroupBuilder MapProductEndpoints(this WebApplication app)
-    {
-        var group = app.MapGroup("/api/products").WithTags("Products");
-
-        group.MapGet("/", GetAll);
-        group.MapGet("/{id:int}", GetById);
-        group.MapPost("/", Create);
-        group.MapPut("/{id:int}", Update);
-        group.MapDelete("/{id:int}", Delete);
-
-        return group;
-    }
-
-    private static async Task<Ok<PagedResult<ProductResponse>>> GetAll(
-        int page, int pageSize, IProductService svc, CancellationToken ct)
-        => TypedResults.Ok(await svc.GetPagedAsync(page, pageSize, ct));
-
-    private static async Task<Results<Ok<ProductResponse>, NotFound>> GetById(
-        int id, IProductService svc, CancellationToken ct)
-    {
-        var result = await svc.GetByIdAsync(id, ct);
-        return result is not null ? TypedResults.Ok(result) : TypedResults.NotFound();
-    }
-
-    private static async Task<Created<ProductResponse>> Create(
-        CreateProductRequest req, IProductService svc, CancellationToken ct)
-    {
-        var result = await svc.CreateAsync(req, ct);
-        return TypedResults.Created($"/api/products/{result.Id}", result);
-    }
-}
-```
-
-- `TypedResults` for OpenAPI schema generation
-- `Results<T1, T2>` union types for multiple status codes
-- Route constraints like `{id:int}` for type safety
-
-## Decision Guide
+- Return `IQueryable` from repositories — always materialize in the repository
+- Always use `AsNoTracking()` on read paths
+- Map entities to DTOs in the service layer, not the endpoint
+- Propagate `CancellationToken` through every async call
+- Create separate validators for Create and Update requests
+- Use `Created()` with location header for POST responses
 
 | Question | Default | Alternative |
 |----------|---------|-------------|
@@ -173,15 +71,15 @@ public static class ProductEndpoints
 | Repository per entity? | Yes | Shared generic repository only if entities are trivially similar |
 | Pagination style? | Offset-based (`page`/`pageSize`) | Cursor-based for large datasets with real-time inserts |
 
-## Common Mistakes to Avoid
+## Examples
 
-- Returning `IQueryable` from repositories — always materialize in the repository
-- Forgetting `AsNoTracking()` on read paths — causes unnecessary change tracking overhead
-- Mapping entities to DTOs inside the endpoint — keep it in the service layer
-- Missing `CancellationToken` propagation — pass it through every async call
-- No validation on `Update` requests — create a separate `UpdateValidator`
-- Exposing auto-increment IDs in create responses without using `Created()` with location header
+See [templates.md](templates.md) for complete code templates for each layer, including:
+- Entity with audit fields
+- `IEntityTypeConfiguration<T>` with max lengths, precision, and indexes
+- Repository with paged queries and `AsNoTracking()`
+- Record DTOs for request/response
+- Minimal API endpoint group with `TypedResults`
 
-## Additional Resources
+## Output
 
-For code templates, see [templates.md](templates.md).
+This skill does not produce output directly — it provides patterns for other skills (`implement-crud`, `generate-api-endpoint`) and for manual CRUD implementation.
